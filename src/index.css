@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --color-surface: #fafafa;
+  --color-card: #ffffff;
+  --color-border: #e5e7eb;
+  --color-muted: #6b7280;
+  --color-primary: #0f172a;
+  --color-primary-hover: #1e293b;
+  --color-accent: #3b82f6;
+  --color-accent-hover: #2563eb;
+  --color-danger: #dc2626;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08);
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+input, select, button, textarea {
+  font-family: inherit;
+}
+
+.input {
+  @apply w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-1 disabled:opacity-50;
+  border-color: var(--color-border);
+  color: var(--color-primary);
+}
+.input::placeholder {
+  color: var(--color-muted);
+}
+.input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50;
+  background-color: var(--color-primary);
+}
+.btn-primary:hover { background-color: var(--color-primary-hover); }
+.btn-primary:focus { --tw-ring-color: var(--color-primary); }
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center rounded-lg border bg-white px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 disabled:opacity-50 hover:bg-gray-50;
+  border-color: var(--color-border);
+  color: var(--color-primary);
+}
+
+.btn-accent {
+  @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50;
+  background-color: var(--color-accent);
+}
+.btn-accent:hover { background-color: var(--color-accent-hover); }
+.btn-accent:focus { --tw-ring-color: var(--color-accent); }
+
+.btn-ghost {
+  @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-300 disabled:opacity-50 hover:bg-gray-100;
+  color: var(--color-muted);
+}
+.btn-ghost:hover { color: var(--color-primary); }
+
+.btn-danger {
+  @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50;
+  background-color: var(--color-danger);
+}
+.btn-danger:hover { background-color: #b91c1c; }
+.btn-danger:focus { --tw-ring-color: var(--color-danger); }
+
+.card {
+  @apply rounded-xl border bg-white;
+  border-color: var(--color-border);
+  box-shadow: var(--shadow);
+}
+
+.table-wrapper {
+  @apply rounded-xl border bg-white;
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+  min-width: 0;
+}
+.table-wrapper table {
+  @apply w-full min-w-[32rem] text-left text-sm;
+}
+.table-wrapper th {
+  @apply bg-gray-50/80 px-4 py-3 font-medium;
+  color: var(--color-muted);
+}
+.table-wrapper td {
+  @apply border-t px-4 py-3;
+  border-color: var(--color-border);
+  color: var(--color-primary);
+}
+.table-wrapper tbody tr:hover {
+  @apply bg-gray-50/50;
+}
+
+.page-head {
+  @apply mb-6 text-xl font-semibold tracking-tight;
+  color: var(--color-primary);
+}
+
+.link {
+  color: var(--color-accent);
+}
+.link:hover {
+  @apply underline;
+}
