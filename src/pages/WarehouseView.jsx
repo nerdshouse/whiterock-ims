@@ -22,7 +22,7 @@ export default function WarehouseView() {
   const [addSafety, setAddSafety] = useState('');
   const [addSeasonal, setAddSeasonal] = useState('');
   const [addGrowth, setAddGrowth] = useState('');
-  const [editingStock, setEditingStock] = useState(null); // { skuCode, currentStock, dailyAvgSale, leadTime, safetyStock, seasonalBuffer, stockForGrowth }
+  const [editingStock, setEditingStock] = useState(null); // { skuCode, currentStock, dailyAvgSale, leadTime, safetyStockDays, seasonalBufferDays, growthBufferDays }
 
   useEffect(() => {
     if (!id) return;
@@ -40,7 +40,7 @@ export default function WarehouseView() {
     return () => unsub();
   }, []);
 
-  const updateStock = async (warehouseId, skuCode, currentStock, dailyAvgSale, leadTime, safetyStock, seasonalBuffer, stockForGrowth) => {
+  const updateStock = async (warehouseId, skuCode, currentStock, dailyAvgSale, leadTime, safetyStockDays, seasonalBufferDays, growthBufferDays) => {
     setError('');
     try {
       const prev = stock.find((s) => s.warehouseId === warehouseId && s.skuCode === skuCode);
@@ -48,9 +48,9 @@ export default function WarehouseView() {
         currentStock: Number(currentStock),
         dailyAvgSale: Number(dailyAvgSale),
         leadTime: Number(leadTime),
-        safetyStock: Number(safetyStock) || 0,
-        seasonalBuffer: Number(seasonalBuffer) || 0,
-        stockForGrowth: Number(stockForGrowth) || 0,
+        safetyStockDays: Number(safetyStockDays) || 0,
+        seasonalBufferDays: Number(seasonalBufferDays) || 0,
+        growthBufferDays: Number(growthBufferDays) || 0,
       }, prev?.currentStock ?? null);
       setEditingStock(null);
     } catch (e) {
@@ -60,7 +60,7 @@ export default function WarehouseView() {
 
   const handleEditStock = () => {
     if (!editingStock) return;
-    updateStock(id, editingStock.skuCode, editingStock.currentStock, editingStock.dailyAvgSale, editingStock.leadTime, editingStock.safetyStock, editingStock.seasonalBuffer, editingStock.stockForGrowth);
+    updateStock(id, editingStock.skuCode, editingStock.currentStock, editingStock.dailyAvgSale, editingStock.leadTime, editingStock.safetyStockDays, editingStock.seasonalBufferDays, editingStock.growthBufferDays);
   };
 
   const handleAddStock = async (e) => {
@@ -72,9 +72,9 @@ export default function WarehouseView() {
         currentStock: Number(addCurrent) || 0,
         dailyAvgSale: Number(addDaily) || 0,
         leadTime: Number(addLead) || 0,
-        safetyStock: Number(addSafety) || 0,
-        seasonalBuffer: Number(addSeasonal) || 0,
-        stockForGrowth: Number(addGrowth) || 0,
+        safetyStockDays: Number(addSafety) || 0,
+        seasonalBufferDays: Number(addSeasonal) || 0,
+        growthBufferDays: Number(addGrowth) || 0,
       });
       setAddSku('');
       setAddCurrent('');
@@ -100,7 +100,7 @@ export default function WarehouseView() {
         <h1 className="page-head mb-0">{warehouse.name}</h1>
         {warehouse.location && <span className="text-sm text-[var(--color-muted)]">{warehouse.location}</span>}
       </div>
-      {error && <p className="mb-4 text-sm text-[var(--color-danger)]">{error}</p>}
+      {error && <div className="alert-error mb-4">{error}</div>}
       <div className="mb-6">
         <button type="button" onClick={() => setShowAddStock((x) => !x)} className="btn-secondary">
           {showAddStock ? 'Cancel' : 'Add stock line'}
@@ -110,7 +110,7 @@ export default function WarehouseView() {
         <form onSubmit={handleAddStock} className="card mb-6 max-w-3xl p-6">
           <h2 className="mb-4 text-lg font-semibold">Add stock line</h2>
           {skus.length === 0 ? (
-            <p className="text-sm text-[var(--color-muted)]">No SKUs found. Add SKUs in SKU Master first.</p>
+            <p className="text-sm text-[var(--color-muted)]">No SKUs yet. Add SKUs from SKU Database (use &quot;Add SKU&quot; there) first.</p>
           ) : (
             <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -137,16 +137,16 @@ export default function WarehouseView() {
               <input type="number" min="0" placeholder="0" value={addLead} onChange={(e) => setAddLead(e.target.value)} className="input" />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-[var(--color-muted)]">Safety stock</label>
-              <input type="number" min="0" placeholder="0" value={addSafety} onChange={(e) => setAddSafety(e.target.value)} className="input" />
+              <label className="mb-1 block text-sm text-[var(--color-muted)]">Safety stock (days)</label>
+              <input type="number" min="0" step="any" placeholder="0" value={addSafety} onChange={(e) => setAddSafety(e.target.value)} className="input" />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-[var(--color-muted)]">Seasonal buffer</label>
-              <input type="number" min="0" placeholder="0" value={addSeasonal} onChange={(e) => setAddSeasonal(e.target.value)} className="input" />
+              <label className="mb-1 block text-sm text-[var(--color-muted)]">Seasonal buffer (days)</label>
+              <input type="number" min="0" step="any" placeholder="0" value={addSeasonal} onChange={(e) => setAddSeasonal(e.target.value)} className="input" />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-[var(--color-muted)]">Stock for Growth</label>
-              <input type="number" min="0" placeholder="0" value={addGrowth} onChange={(e) => setAddGrowth(e.target.value)} className="input" />
+              <label className="mb-1 block text-sm text-[var(--color-muted)]">Growth buffer (days)</label>
+              <input type="number" min="0" step="any" placeholder="0" value={addGrowth} onChange={(e) => setAddGrowth(e.target.value)} className="input" />
             </div>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -176,19 +176,19 @@ export default function WarehouseView() {
                 <td>{s.dailyAvgSale}</td>
                 <td>{s.leadTime}</td>
                 <td className="whitespace-nowrap">
-                  <button type="button" onClick={() => setEditingStock({ skuCode: s.skuCode, currentStock: s.currentStock, dailyAvgSale: s.dailyAvgSale, leadTime: s.leadTime, safetyStock: s.safetyStock ?? 0, seasonalBuffer: s.seasonalBuffer ?? 0, stockForGrowth: s.stockForGrowth ?? 0 })} className="btn-ghost py-1 text-xs">Update stock</button>
+                  <button type="button" onClick={() => setEditingStock({ skuCode: s.skuCode, currentStock: s.currentStock, dailyAvgSale: s.dailyAvgSale, leadTime: s.leadTime, safetyStockDays: s.safetyStockDays ?? (s.dailyAvgSale > 0 && s.safetyStock ? s.safetyStock / s.dailyAvgSale : 0), seasonalBufferDays: s.seasonalBufferDays ?? (s.dailyAvgSale > 0 && s.seasonalBuffer ? s.seasonalBuffer / s.dailyAvgSale : 0), growthBufferDays: s.growthBufferDays ?? (s.dailyAvgSale > 0 && s.stockForGrowth ? s.stockForGrowth / s.dailyAvgSale : 0) })} className="btn-ghost py-1 text-xs">Update stock</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-        {stock.length === 0 && <p className="px-4 py-8 text-center text-[var(--color-muted)]">No stock records.</p>}
+        {stock.length === 0 && <p className="empty-state">No stock records. Use &quot;Add stock line&quot; to add one.</p>}
       </div>
 
       {/* Edit stock modal */}
       {editingStock && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4" onClick={() => setEditingStock(null)}>
-          <div className="card max-w-md w-full p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-backdrop" onClick={() => setEditingStock(null)}>
+          <div className="card modal-content p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="mb-4 text-lg font-semibold">Update stock</h2>
             <p className="mb-3 text-sm text-[var(--color-muted)]">{editingStock.skuCode} {skuMap[editingStock.skuCode]?.name && `– ${skuMap[editingStock.skuCode].name}`}</p>
             <div className="space-y-4">
@@ -205,16 +205,16 @@ export default function WarehouseView() {
                 <input type="number" min="0" value={editingStock.leadTime} onChange={(e) => setEditingStock((x) => ({ ...x, leadTime: e.target.value }))} className="input" />
               </div>
               <div>
-                <label className="mb-1 block text-sm text-[var(--color-muted)]">Safety stock</label>
-                <input type="number" min="0" value={editingStock.safetyStock} onChange={(e) => setEditingStock((x) => ({ ...x, safetyStock: e.target.value }))} className="input" />
+                <label className="mb-1 block text-sm text-[var(--color-muted)]">Safety stock (days)</label>
+                <input type="number" min="0" step="any" value={editingStock.safetyStockDays} onChange={(e) => setEditingStock((x) => ({ ...x, safetyStockDays: e.target.value }))} className="input" />
               </div>
               <div>
-                <label className="mb-1 block text-sm text-[var(--color-muted)]">Seasonal buffer</label>
-                <input type="number" min="0" value={editingStock.seasonalBuffer} onChange={(e) => setEditingStock((x) => ({ ...x, seasonalBuffer: e.target.value }))} className="input" />
+                <label className="mb-1 block text-sm text-[var(--color-muted)]">Seasonal buffer (days)</label>
+                <input type="number" min="0" step="any" value={editingStock.seasonalBufferDays} onChange={(e) => setEditingStock((x) => ({ ...x, seasonalBufferDays: e.target.value }))} className="input" />
               </div>
               <div>
-                <label className="mb-1 block text-sm text-[var(--color-muted)]">Stock for Growth</label>
-                <input type="number" min="0" value={editingStock.stockForGrowth} onChange={(e) => setEditingStock((x) => ({ ...x, stockForGrowth: e.target.value }))} className="input" />
+                <label className="mb-1 block text-sm text-[var(--color-muted)]">Growth buffer (days)</label>
+                <input type="number" min="0" step="any" value={editingStock.growthBufferDays} onChange={(e) => setEditingStock((x) => ({ ...x, growthBufferDays: e.target.value }))} className="input" />
               </div>
             </div>
             <div className="mt-4 flex gap-2">

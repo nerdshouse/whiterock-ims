@@ -174,21 +174,31 @@ export async function getStockRecord(warehouseId, skuCode) {
   return { id: d.id, ...data, updatedAt: data.updatedAt?.toMillis?.() };
 }
 
-export async function setStock(warehouseId, skuCode, { currentStock, dailyAvgSale, leadTime, safetyStock, seasonalBuffer, stockForGrowth }, previousStock = null) {
+export async function setStock(warehouseId, skuCode, { currentStock, dailyAvgSale, leadTime, safetyStock, seasonalBuffer, stockForGrowth, safetyStockDays, seasonalBufferDays, growthBufferDays }, previousStock = null) {
   const id = stockDocId(warehouseId, skuCode);
   const ref = doc(db, 'stock', id);
   const docSnap = await getDoc(ref);
+  const dailyAvg = Number(dailyAvgSale ?? (docSnap.exists() ? docSnap.data().dailyAvgSale : 0));
+  const safetyDays = Number(safetyStockDays ?? (docSnap.exists() ? docSnap.data().safetyStockDays : undefined));
+  const seasonalDays = Number(seasonalBufferDays ?? (docSnap.exists() ? docSnap.data().seasonalBufferDays : undefined));
+  const growthDays = Number(growthBufferDays ?? (docSnap.exists() ? docSnap.data().growthBufferDays : undefined));
+  const safetyQty = Number.isFinite(safetyDays) ? Math.round(dailyAvg * safetyDays) : Number(safetyStock ?? (docSnap.exists() ? docSnap.data().safetyStock : 0)) || 0;
+  const seasonalQty = Number.isFinite(seasonalDays) ? Math.round(dailyAvg * seasonalDays) : Number(seasonalBuffer ?? (docSnap.exists() ? docSnap.data().seasonalBuffer : 0)) || 0;
+  const growthQty = Number.isFinite(growthDays) ? Math.round(dailyAvg * growthDays) : Number(stockForGrowth ?? (docSnap.exists() ? docSnap.data().stockForGrowth : 0)) || 0;
   const payload = {
     warehouseId,
     skuCode,
     currentStock: Number(currentStock ?? (docSnap.exists() ? docSnap.data().currentStock : 0)),
-    dailyAvgSale: Number(dailyAvgSale ?? (docSnap.exists() ? docSnap.data().dailyAvgSale : 0)),
+    dailyAvgSale: dailyAvg,
     leadTime: Number(leadTime ?? (docSnap.exists() ? docSnap.data().leadTime : 0)),
-    safetyStock: Number(safetyStock ?? (docSnap.exists() ? docSnap.data().safetyStock : 0)) || 0,
-    seasonalBuffer: Number(seasonalBuffer ?? (docSnap.exists() ? docSnap.data().seasonalBuffer : 0)) || 0,
-    stockForGrowth: Number(stockForGrowth ?? (docSnap.exists() ? docSnap.data().stockForGrowth : 0)) || 0,
+    safetyStock: safetyQty,
+    seasonalBuffer: seasonalQty,
+    stockForGrowth: growthQty,
     updatedAt: serverTimestamp(),
   };
+  if (Number.isFinite(safetyDays)) payload.safetyStockDays = safetyDays;
+  if (Number.isFinite(seasonalDays)) payload.seasonalBufferDays = seasonalDays;
+  if (Number.isFinite(growthDays)) payload.growthBufferDays = growthDays;
   if (docSnap.exists()) {
     await updateDoc(ref, payload);
   } else {
@@ -209,33 +219,90 @@ export async function setStock(warehouseId, skuCode, { currentStock, dailyAvgSal
   return { id: d.id, ...data, updatedAt: data.updatedAt?.toMillis?.() };
 }
 
-export async function addStockRecord(warehouseId, skuCode, { currentStock, dailyAvgSale, leadTime, safetyStock, seasonalBuffer, stockForGrowth }) {
+export async function addStockRecord(warehouseId, skuCode, payload = {}) {
   const code = String(skuCode).trim();
-  const id = stockDocId(warehouseId, code);
+  const wid = String(warehouseId).trim();
+  if (!wid || !code) throw new Error('Warehouse and SKU are required');
+  const id = stockDocId(wid, code);
   const ref = doc(db, 'stock', id);
   const docSnap = await getDoc(ref);
   if (docSnap.exists()) throw new Error('Stock record already exists for this warehouse and SKU');
-  await setDoc(ref, {
-    warehouseId: String(warehouseId).trim(),
+  const dailyAvg = Number(payload.dailyAvgSale) || 0;
+  const safetyDays = Number(payload.safetyStockDays);
+  const seasonalDays = Number(payload.seasonalBufferDays);
+  const growthDays = Number(payload.growthBufferDays);
+  const safetyQty = Number.isFinite(safetyDays) ? Math.round(dailyAvg * safetyDays) : Number(payload.safetyStock) || 0;
+  const seasonalQty = Number.isFinite(seasonalDays) ? Math.round(dailyAvg * seasonalDays) : Number(payload.seasonalBuffer) || 0;
+  const growthQty = Number.isFinite(growthDays) ? Math.round(dailyAvg * growthDays) : Number(payload.stockForGrowth) || 0;
+  const data = {
+    warehouseId: wid,
     skuCode: code,
-    currentStock: Number(currentStock) || 0,
-    dailyAvgSale: Number(dailyAvgSale) || 0,
-    leadTime: Number(leadTime) || 0,
-    safetyStock: Number(safetyStock) || 0,
-    seasonalBuffer: Number(seasonalBuffer) || 0,
-    stockForGrowth: Number(stockForGrowth) || 0,
+    currentStock: Number(payload.currentStock) || 0,
+    dailyAvgSale: dailyAvg,
+    leadTime: Number(payload.leadTime) || 0,
+    safetyStock: safetyQty,
+    seasonalBuffer: seasonalQty,
+    stockForGrowth: growthQty,
     updatedAt: serverTimestamp(),
-  });
+  };
+  if (Number.isFinite(safetyDays)) data.safetyStockDays = safetyDays;
+  if (Number.isFinite(seasonalDays)) data.seasonalBufferDays = seasonalDays;
+  if (Number.isFinite(growthDays)) data.growthBufferDays = growthDays;
+  await setDoc(ref, data);
+  const d = await getDoc(ref);
+  const out = d.data();
+  return { id: d.id, ...out, updatedAt: out.updatedAt?.toMillis?.() };
+}
+
+/** Partial update of a stock record. Recomputes buffer qty from days when days are provided. */
+export async function updateStock(warehouseId, skuCode, updates) {
+  const id = stockDocId(warehouseId, skuCode);
+  const ref = doc(db, 'stock', id);
+  const docSnap = await getDoc(ref);
+  if (!docSnap.exists()) throw new Error('Stock record not found');
+  const current = docSnap.data();
+  const dailyAvg = Number(updates.dailyAvgSale ?? current.dailyAvgSale) || 0;
+  const safetyDays = updates.safetyStockDays !== undefined ? Number(updates.safetyStockDays) : current.safetyStockDays;
+  const seasonalDays = updates.seasonalBufferDays !== undefined ? Number(updates.seasonalBufferDays) : current.seasonalBufferDays;
+  const growthDays = updates.growthBufferDays !== undefined ? Number(updates.growthBufferDays) : current.growthBufferDays;
+  const payload = { updatedAt: serverTimestamp() };
+  if (updates.currentStock !== undefined) payload.currentStock = Number(updates.currentStock);
+  if (updates.dailyAvgSale !== undefined) payload.dailyAvgSale = Number(updates.dailyAvgSale);
+  if (updates.leadTime !== undefined) payload.leadTime = Number(updates.leadTime);
+  if (updates.safetyStockDays !== undefined) payload.safetyStockDays = Number(updates.safetyStockDays);
+  if (updates.seasonalBufferDays !== undefined) payload.seasonalBufferDays = Number(updates.seasonalBufferDays);
+  if (updates.growthBufferDays !== undefined) payload.growthBufferDays = Number(updates.growthBufferDays);
+  const safeDays = (d) => (Number.isFinite(d) ? d : 0);
+  payload.safetyStock = Math.round(dailyAvg * safeDays(safetyDays));
+  payload.seasonalBuffer = Math.round(dailyAvg * safeDays(seasonalDays));
+  payload.stockForGrowth = Math.round(dailyAvg * safeDays(growthDays));
+  if (updates.closingStockUpdateDate !== undefined) payload.closingStockUpdateDate = updates.closingStockUpdateDate ? new Date(updates.closingStockUpdateDate) : null;
+  await updateDoc(ref, payload);
+  if (updates.currentStock !== undefined && current.currentStock !== payload.currentStock) {
+    await addStockMovement({
+      warehouseId,
+      skuCode,
+      changeType: 'manual_update',
+      quantityDelta: payload.currentStock - current.currentStock,
+      previousStock: current.currentStock,
+      newStock: payload.currentStock,
+    });
+  }
   const d = await getDoc(ref);
   const data = d.data();
   return { id: d.id, ...data, updatedAt: data.updatedAt?.toMillis?.() };
+}
+
+export async function deleteStockRecord(warehouseId, skuCode) {
+  const id = stockDocId(warehouseId, skuCode);
+  await deleteDoc(doc(db, 'stock', id));
 }
 
 export function subscribeStock(warehouseId, cb) {
   let q = query(stockCollection(), orderBy('warehouseId'), orderBy('skuCode'));
   if (warehouseId) q = query(stockCollection(), where('warehouseId', '==', warehouseId), orderBy('skuCode'));
   return onSnapshot(q, (snap) => {
-    cb(snap.docs.map((d) => { const data = d.data(); return { id: d.id, ...data, updatedAt: data.updatedAt?.toMillis?.() }; }));
+    cb(snap.docs.map((d) => { const data = d.data(); return { id: d.id, ...data, updatedAt: data.updatedAt?.toMillis?.(), closingStockUpdateDate: data.closingStockUpdateDate?.toMillis?.() ?? data.updatedAt?.toMillis?.() }; }));
   });
 }
 
@@ -243,7 +310,7 @@ export function subscribeStock(warehouseId, cb) {
 export function subscribeAllStock(cb) {
   const q = query(stockCollection(), orderBy('warehouseId'), orderBy('skuCode'));
   return onSnapshot(q, (snap) => {
-    cb(snap.docs.map((d) => { const data = d.data(); return { id: d.id, ...data, updatedAt: data.updatedAt?.toMillis?.() }; }));
+    cb(snap.docs.map((d) => { const data = d.data(); return { id: d.id, ...data, updatedAt: data.updatedAt?.toMillis?.(), closingStockUpdateDate: data.closingStockUpdateDate?.toMillis?.() ?? data.updatedAt?.toMillis?.() }; }));
   });
 }
 

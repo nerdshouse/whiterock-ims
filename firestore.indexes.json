@@ -5,7 +5,8 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "warehouseId", "order": "ASCENDING" },
-        { "fieldPath": "skuCode", "order": "ASCENDING" }
+        { "fieldPath": "skuCode", "order": "ASCENDING" },
+        { "fieldPath": "__name__", "order": "ASCENDING" }
       ]
     },
     {
@@ -14,20 +15,6 @@
       "fields": [
         { "fieldPath": "warehouseId", "order": "ASCENDING" },
         { "fieldPath": "timestamp", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "members",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "purchaseOrders",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "etd", "order": "ASCENDING" }
       ]
     }
   ],

@@ -33,7 +33,13 @@ export default function PurchaseOrders() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ poNumber: '', warehouseId: '', skuCode: '', quantity: '', etd: new Date().toISOString().slice(0, 10), eta: '' });
+  const [form, setForm] = useState({
+    poNumber: '',
+    warehouseId: '',
+    etd: new Date().toISOString().slice(0, 10),
+    eta: '',
+    selectedSkus: {}, // { [skuCode]: quantity }
+  });
   const [statusModal, setStatusModal] = useState(null); // { po, newStatus } when open
   const [statusReason, setStatusReason] = useState('');
   const [stockList, setStockList] = useState([]);
@@ -66,17 +72,38 @@ export default function PurchaseOrders() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    const poNumber = form.poNumber.trim();
+    const warehouseId = form.warehouseId.trim();
+    if (!poNumber || !warehouseId) {
+      setError('PO Number and Warehouse are required');
+      return;
+    }
+    const validLines = Object.entries(form.selectedSkus)
+      .filter(([, qty]) => (Number(qty) || 0) >= 1)
+      .map(([skuCode, quantity]) => ({ skuCode, quantity: Number(quantity) || 1 }));
+    if (validLines.length === 0) {
+      setError('Select at least one SKU and set quantity ≥ 1');
+      return;
+    }
     setSubmitting(true);
     try {
-      await addPurchaseOrder({
-        poNumber: form.poNumber.trim(),
-        warehouseId: form.warehouseId.trim(),
-        skuCode: form.skuCode.trim(),
-        quantity: Number(form.quantity) || 1,
-        etd: form.etd || undefined,
-        eta: form.eta?.trim() || undefined,
+      for (const line of validLines) {
+        await addPurchaseOrder({
+          poNumber,
+          warehouseId,
+          skuCode: line.skuCode,
+          quantity: line.quantity,
+          etd: form.etd || undefined,
+          eta: form.eta?.trim() || undefined,
+        });
+      }
+      setForm({
+        poNumber: '',
+        warehouseId: '',
+        etd: new Date().toISOString().slice(0, 10),
+        eta: '',
+        selectedSkus: {},
       });
-      setForm({ poNumber: '', warehouseId: '', skuCode: '', quantity: '', etd: new Date().toISOString().slice(0, 10), eta: '' });
       setShowForm(false);
     } catch (e) {
       setError(e.message || 'Failed to create PO');
@@ -84,6 +111,30 @@ export default function PurchaseOrders() {
       setSubmitting(false);
     }
   };
+
+  const activeSkus = skus.filter((s) => s.status === 'Active');
+  const toggleSku = (skuCode, checked) => {
+    setForm((f) => {
+      const next = { ...f.selectedSkus };
+      if (checked) next[skuCode] = 1;
+      else delete next[skuCode];
+      return { ...f, selectedSkus: next };
+    });
+  };
+
+  const updateSkuQuantity = (skuCode, value) => {
+    setForm((f) => ({ ...f, selectedSkus: { ...f.selectedSkus, [skuCode]: value } }));
+  };
+
+  const removeSelectedSku = (skuCode) => {
+    setForm((f) => {
+      const next = { ...f.selectedSkus };
+      delete next[skuCode];
+      return { ...f, selectedSkus: next };
+    });
+  };
+
+  const selectedEntries = Object.entries(form.selectedSkus);
 
   const setStatus = async () => {
     if (!statusModal) return;
@@ -186,32 +237,99 @@ export default function PurchaseOrders() {
         </button>
       </div>
       {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-[var(--color-danger)]">
-          {error}
-        </div>
+        <div className="alert-error mb-4">{error}</div>
       )}
       {showForm && (
-        <form onSubmit={handleSubmit} className="card mb-6 grid grid-cols-2 gap-4 p-6 max-w-2xl">
-          <input placeholder="PO Number (e.g. PO1)" value={form.poNumber} onChange={(e) => setForm((f) => ({ ...f, poNumber: e.target.value }))} className="input" required />
-          <select value={form.warehouseId} onChange={(e) => setForm((f) => ({ ...f, warehouseId: e.target.value }))} className="input" required>
-            <option value="">Select warehouse</option>
-            {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-          </select>
-          <select value={form.skuCode} onChange={(e) => setForm((f) => ({ ...f, skuCode: e.target.value }))} className="input" required>
-            <option value="">Select SKU</option>
-            {skus.filter((s) => s.status === 'Active').map((s) => <option key={s.id} value={s.skuCode}>{s.skuCode} – {s.name}</option>)}
-          </select>
-          <input type="number" min="1" placeholder="Quantity" value={form.quantity} onChange={(e) => setForm((f) => ({ ...f, quantity: e.target.value }))} className="input" required />
-          <div className="col-span-2">
-            <label className="mb-1 block text-sm text-[var(--color-muted)]">ETD (departure)</label>
-            <input type="date" value={form.etd} onChange={(e) => setForm((f) => ({ ...f, etd: e.target.value }))} className="input max-w-xs" />
+        <form onSubmit={handleSubmit} className="card mb-6 max-w-3xl p-6">
+          <h2 className="mb-4 text-lg font-semibold">Create PO (multiple SKUs)</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-sm text-[var(--color-muted)]">PO Number</label>
+              <input placeholder="e.g. PO1" value={form.poNumber} onChange={(e) => setForm((f) => ({ ...f, poNumber: e.target.value }))} className="input" required />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-[var(--color-muted)]">Warehouse</label>
+              <select value={form.warehouseId} onChange={(e) => setForm((f) => ({ ...f, warehouseId: e.target.value }))} className="input" required>
+                <option value="">Select warehouse</option>
+                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-[var(--color-muted)]">ETD (departure)</label>
+              <input type="date" value={form.etd} onChange={(e) => setForm((f) => ({ ...f, etd: e.target.value }))} className="input" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-[var(--color-muted)]">ETA (arrival) – optional</label>
+              <input type="date" value={form.eta} onChange={(e) => setForm((f) => ({ ...f, eta: e.target.value }))} className="input" />
+            </div>
           </div>
-          <div className="col-span-2">
-            <label className="mb-1 block text-sm text-[var(--color-muted)]">ETA (arrival) – optional</label>
-            <input type="date" value={form.eta} onChange={(e) => setForm((f) => ({ ...f, eta: e.target.value }))} className="input max-w-xs" />
+
+          <div className="mt-6">
+            <label className="mb-2 block text-sm font-medium text-[var(--color-muted)]">Select SKUs (check all that apply)</label>
+            <div className="max-h-48 overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                {activeSkus.map((s) => (
+                  <label key={s.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-white/60">
+                    <input
+                      type="checkbox"
+                      checked={form.selectedSkus[s.skuCode] != null}
+                      onChange={(e) => toggleSku(s.skuCode, e.target.checked)}
+                      className="h-4 w-4 rounded border-[var(--color-border)]"
+                    />
+                    <span className="text-sm">{s.skuCode}</span>
+                    <span className="truncate text-sm text-[var(--color-muted)]">{s.name}</span>
+                  </label>
+                ))}
+              </div>
+              {activeSkus.length === 0 && (
+                <p className="py-2 text-sm text-[var(--color-muted)]">No active SKUs. Add SKUs in SKU Database first.</p>
+              )}
+            </div>
           </div>
-          <div className="col-span-2 flex flex-wrap gap-2">
-            <button type="submit" disabled={submitting || warehouses.length === 0 || skus.filter((s) => s.status === 'Active').length === 0} className="btn-primary">
+
+          {selectedEntries.length > 0 && (
+            <div className="mt-4">
+              <label className="mb-2 block text-sm font-medium text-[var(--color-muted)]">Quantity per SKU</label>
+              <div className="rounded-lg border border-[var(--color-border)] overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-[var(--color-surface)]">
+                      <th className="px-3 py-2 text-left font-medium">SKU</th>
+                      <th className="px-3 py-2 text-left font-medium text-[var(--color-muted)]">Item</th>
+                      <th className="px-3 py-2 text-left font-medium w-28">Quantity</th>
+                      <th className="w-0" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedEntries.map(([skuCode, qty]) => {
+                      const sku = activeSkus.find((s) => s.skuCode === skuCode);
+                      return (
+                        <tr key={skuCode} className="border-t border-[var(--color-border)]">
+                          <td className="px-3 py-2 font-medium">{skuCode}</td>
+                          <td className="px-3 py-2 text-[var(--color-muted)]">{sku?.name ?? '—'}</td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number"
+                              min="1"
+                              value={qty}
+                              onChange={(e) => updateSkuQuantity(skuCode, e.target.value)}
+                              className="input w-20 py-1"
+                            />
+                          </td>
+                          <td className="px-2 py-2">
+                            <button type="button" onClick={() => removeSelectedSku(skuCode)} className="btn-ghost text-xs text-[var(--color-danger)]">Remove</button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-6 flex flex-wrap gap-2">
+            <button type="submit" disabled={submitting || warehouses.length === 0 || activeSkus.length === 0 || selectedEntries.length === 0} className="btn-primary">
               {submitting ? 'Creating…' : 'Create PO'}
             </button>
             <button type="button" onClick={() => setShowForm(false)} className="btn-secondary">Cancel</button>
@@ -274,13 +392,13 @@ export default function PurchaseOrders() {
             })}
           </tbody>
         </table>
-        {list.length === 0 && !error && <p className="px-4 py-8 text-center text-[var(--color-muted)]">No POs in 60-day window.</p>}
+        {list.length === 0 && !error && <p className="empty-state">No POs in the 60-day window.</p>}
       </div>
 
       {/* Status change modal */}
       {statusModal && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4" onClick={() => { setStatusModal(null); setStatusReason(''); setError(''); }}>
-          <div className="card max-w-md w-full p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-backdrop" onClick={() => { setStatusModal(null); setStatusReason(''); setError(''); }}>
+          <div className="card modal-content p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="mb-2 text-lg font-semibold">Change status</h2>
             <p className="mb-4 text-sm text-[var(--color-muted)]">
               Changing <strong>{statusModal.po.poNumber}</strong> to <strong>{statusModal.newStatus}</strong>. Please provide a reason for this change.
@@ -299,8 +417,8 @@ export default function PurchaseOrders() {
 
       {/* Delete confirm modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4" onClick={() => setDeleteConfirm(null)}>
-          <div className="card max-w-sm w-full p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-backdrop" onClick={() => setDeleteConfirm(null)}>
+          <div className="card modal-content p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="mb-2 text-lg font-semibold">Delete purchase order</h2>
             <p className="mb-4 text-sm text-[var(--color-muted)]">
               Delete <strong>{deleteConfirm.po.poNumber}</strong>? This cannot be undone. {deleteConfirm.po.status === 'Received' && 'Stock was already added when marked Received.'}
@@ -315,8 +433,8 @@ export default function PurchaseOrders() {
 
       {/* Edit PO modal */}
       {editModal && (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4" onClick={() => { setEditModal(null); setError(''); }}>
-          <div className="card max-w-md w-full p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-backdrop" onClick={() => { setEditModal(null); setError(''); }}>
+          <div className="card modal-content p-6" onClick={(e) => e.stopPropagation()}>
             <h2 className="mb-4 text-lg font-semibold">Edit purchase order</h2>
             <p className="mb-4 text-sm text-[var(--color-muted)]">
               Warehouse: <strong>{warehouseNames[editModal.po.warehouseId] || editModal.po.warehouseId}</strong> · SKU: <strong>{editModal.po.skuCode}</strong> (read-only)
