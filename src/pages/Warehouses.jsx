@@ -100,14 +100,14 @@ export default function Warehouses() {
           </thead>
           <tbody>
             {list.map((w) => (
-              <tr key={w.id}>
-                <td><Link to={`/warehouses/${w.id}`} className="link font-medium">{w.name}</Link></td>
-                <td className="text-[var(--color-muted)]">{w.location || '—'}</td>
-                <td className="whitespace-nowrap">
-                  <div className="flex gap-2">
+              <tr key={w.id} className="align-middle">
+                <td className="align-middle"><Link to={`/warehouses/${w.id}`} className="link font-medium">{w.name}</Link></td>
+                <td className="align-middle text-[var(--color-muted)]">{w.location || '—'}</td>
+                <td className="align-middle whitespace-nowrap">
+                  <div className="flex items-center gap-2">
                     <Link to={`/warehouses/${w.id}`} className="link text-xs">View</Link>
-                    <button type="button" onClick={() => startEdit(w)} className="btn-ghost py-0 text-xs">Edit</button>
-                    <button type="button" onClick={() => setDeleteConfirm({ id: w.id, name: w.name })} className="btn-ghost py-0 text-xs text-[var(--color-danger)] hover:bg-red-50 hover:text-[var(--color-danger)]">Remove</button>
+                    <button type="button" onClick={() => startEdit(w)} className="btn-ghost py-0 text-xs leading-normal">Edit</button>
+                    <button type="button" onClick={() => setDeleteConfirm({ id: w.id, name: w.name })} className="btn-ghost py-0 text-xs leading-normal text-[var(--color-danger)] hover:bg-red-50 hover:text-[var(--color-danger)]">Remove</button>
                   </div>
                 </td>
               </tr>

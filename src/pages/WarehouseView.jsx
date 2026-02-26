@@ -95,10 +95,12 @@ export default function WarehouseView() {
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-center gap-2">
+      <div className="mb-6 flex flex-wrap items-baseline gap-2">
         <Link to="/warehouses" className="link text-sm">← Warehouses</Link>
-        <h1 className="page-head mb-0">{warehouse.name}</h1>
-        {warehouse.location && <span className="text-sm text-[var(--color-muted)]">{warehouse.location}</span>}
+        <div className="flex items-baseline gap-2">
+          <h1 className="page-head m-0">{warehouse.name}</h1>
+          {warehouse.location && <span className="text-sm text-[var(--color-muted)]">{warehouse.location}</span>}
+        </div>
       </div>
       {error && <div className="alert-error mb-4">{error}</div>}
       <div className="mb-6">
