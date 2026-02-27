@@ -40,9 +40,20 @@ export default function Dashboard() {
     .map((st) => {
       const sku = skuMap[st.skuCode];
       const dailyAvg = num(st.dailyAvgSale);
+      const safetyDays = st.safetyStockDays != null ? num(st.safetyStockDays) : (dailyAvg > 0 ? num(st.safetyStock) / dailyAvg : 0);
+      const seasonalDays = st.seasonalBufferDays != null ? num(st.seasonalBufferDays) : (dailyAvg > 0 ? num(st.seasonalBuffer) / dailyAvg : 0);
+      const growthDays = st.growthBufferDays != null ? num(st.growthBufferDays) : (dailyAvg > 0 ? num(st.stockForGrowth) / dailyAvg : 0);
+      const safetyQty = Math.round(dailyAvg * safetyDays);
+      const seasonalQty = Math.round(dailyAvg * seasonalDays);
+      const growthQty = Math.round(dailyAvg * growthDays);
       const closingStock = num(st.currentStock);
-      const stockEndDateMs = dailyAvg > 0 && closingStock >= 0
-        ? Date.now() + (closingStock / dailyAvg) * 24 * 60 * 60 * 1000
+      const totalBufferQty = safetyQty + seasonalQty + growthQty;
+      // Effective stock = closing stock − (safety stock QTY + seasonal stock QTY + growth buffer stock QTY)
+      const effectiveStock = closingStock - totalBufferQty;
+      const stockEndDays = dailyAvg > 0 ? Math.round(effectiveStock / dailyAvg) : null;
+      const baseDateMs = st.closingStockUpdateDate ?? st.updatedAt ?? Date.now();
+      const stockEndDateMs = stockEndDays != null
+        ? baseDateMs + stockEndDays * 24 * 60 * 60 * 1000
         : null;
       return {
         id: st.id,

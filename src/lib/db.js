@@ -80,6 +80,42 @@ export function subscribeWarehouses(cb) {
   });
 }
 
+// ——— Locations (for warehouse location dropdown; managed in Settings) ———
+export function locationsCollection() {
+  return collection(db, 'locations');
+}
+
+export async function addLocation(name) {
+  const ref = await addDoc(locationsCollection(), {
+    name: String(name).trim(),
+    createdAt: Timestamp.now(),
+  });
+  const d = await getDoc(ref);
+  const data = d.data();
+  return { id: d.id, ...data, createdAt: data.createdAt?.toMillis?.() };
+}
+
+export async function deleteLocation(id) {
+  await deleteDoc(doc(db, 'locations', id));
+}
+
+export async function updateLocation(id, name) {
+  const ref = doc(db, 'locations', id);
+  await updateDoc(ref, { name: String(name).trim() });
+}
+
+export function subscribeLocations(cb) {
+  const q = query(locationsCollection());
+  return onSnapshot(q, (snap) => {
+    const list = snap.docs.map((d) => {
+      const data = d.data();
+      return { id: d.id, ...data, createdAt: data.createdAt?.toMillis?.() };
+    });
+    list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    cb(list);
+  });
+}
+
 // ——— SKUs ———
 export function skusCollection() {
   return collection(db, 'skus');

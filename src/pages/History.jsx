@@ -46,7 +46,9 @@ export default function History() {
   return (
     <div>
       <h1 className="page-head">History</h1>
-      <p className="mb-4 text-sm text-[var(--color-muted)]">Current daily average and buffer days by warehouse and SKU.</p>
+      <p className="mb-4 text-sm text-[var(--color-muted)]">
+        History entries cannot be deleted manually. Data older than 90 days is removed automatically.
+      </p>
       <div className="mb-6">
         <label className="mb-1 block text-sm text-[var(--color-muted)]">Warehouse</label>
         <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className="input max-w-xs">

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { addWarehouse, updateWarehouse, deleteWarehouse, subscribeWarehouses } from '../lib/db';
+import { addWarehouse, updateWarehouse, deleteWarehouse, subscribeWarehouses, subscribeLocations } from '../lib/db';
 
 export default function Warehouses() {
   const [list, setList] = useState([]);
+  const [locations, setLocations] = useState([]);
   const [error, setError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null); // null | { id, name, location }
@@ -13,6 +14,10 @@ export default function Warehouses() {
 
   useEffect(() => {
     const unsub = subscribeWarehouses(setList);
+    return () => unsub();
+  }, []);
+  useEffect(() => {
+    const unsub = subscribeLocations(setLocations);
     return () => unsub();
   }, []);
 
@@ -75,12 +80,20 @@ export default function Warehouses() {
           <h2 className="mb-4 text-lg font-semibold">Add warehouse</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm text-[var(--color-muted)]">Name</label>
-              <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} className="input" required />
+              <label className="mb-1 block text-sm text-[var(--color-muted)]">Item Group</label>
+              <input placeholder="Item Group" value={name} onChange={(e) => setName(e.target.value)} className="input" required />
             </div>
             <div>
               <label className="mb-1 block text-sm text-[var(--color-muted)]">Location</label>
-              <input placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} className="input" />
+              <select value={location} onChange={(e) => setLocation(e.target.value)} className="input">
+                <option value="">Select location</option>
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.name}>{loc.name}</option>
+                ))}
+              </select>
+              {locations.length === 0 && (
+                <p className="mt-1 text-xs text-[var(--color-muted)]">Add locations from Settings.</p>
+              )}
             </div>
           </div>
           <div className="mt-4 flex gap-2">
@@ -93,7 +106,7 @@ export default function Warehouses() {
         <table>
           <thead>
             <tr>
-              <th>Name</th>
+              <th>Item Group</th>
               <th>Location</th>
               <th className="w-0 whitespace-nowrap">Actions</th>
             </tr>
@@ -124,12 +137,20 @@ export default function Warehouses() {
             <h2 className="mb-4 text-lg font-semibold">Edit warehouse</h2>
             <form onSubmit={handleEdit} className="space-y-4">
               <div>
-                <label className="mb-1 block text-sm text-[var(--color-muted)]">Name</label>
-                <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} className="input w-full" required />
+                <label className="mb-1 block text-sm text-[var(--color-muted)]">Item Group</label>
+                <input placeholder="Item Group" value={name} onChange={(e) => setName(e.target.value)} className="input w-full" required />
               </div>
               <div>
                 <label className="mb-1 block text-sm text-[var(--color-muted)]">Location</label>
-                <input placeholder="Location" value={location} onChange={(e) => setLocation(e.target.value)} className="input w-full" />
+                <select value={location} onChange={(e) => setLocation(e.target.value)} className="input w-full">
+                  <option value="">Select location</option>
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.name}>{loc.name}</option>
+                  ))}
+                </select>
+                {locations.length === 0 && (
+                  <p className="mt-1 text-xs text-[var(--color-muted)]">Add locations from Settings.</p>
+                )}
               </div>
               <div className="flex gap-2 pt-2">
                 <button type="submit" className="btn-primary">Update</button>

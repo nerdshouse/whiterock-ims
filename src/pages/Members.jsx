@@ -8,7 +8,7 @@ function formatDate(ms) {
   return new Date(ms).toLocaleDateString();
 }
 
-export default function Members() {
+export default function Members({ embedInSettings = false }) {
   const [list, setList] = useState([]);
   const [error, setError] = useState('');
   const [modal, setModal] = useState(null); // null | 'add' | { type: 'edit', member } | { type: 'delete', member }
@@ -83,15 +83,24 @@ export default function Members() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="page-head">Members</h1>
-          <p className="mt-1 text-sm text-[var(--color-muted)]">Only listed members can sign in with Google.</p>
+      {!embedInSettings && (
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <div>
+            <h1 className="page-head">Members</h1>
+            <p className="mt-1 text-sm text-[var(--color-muted)]">Only listed members can sign in with Google.</p>
+          </div>
+          <button type="button" onClick={openAdd} className="btn-primary">
+            Add member
+          </button>
         </div>
-        <button type="button" onClick={openAdd} className="btn-primary">
-          Add member
-        </button>
-      </div>
+      )}
+      {embedInSettings && (
+        <div className="flex flex-wrap items-center justify-end gap-4 mb-4">
+          <button type="button" onClick={openAdd} className="btn-primary">
+            Add member
+          </button>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-[var(--color-danger)]">

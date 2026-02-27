@@ -29,6 +29,11 @@ Allow-list for sign-in (Google only). Only listed members can access the app.
 - **Document ID**: auto-generated
 - **Fields**: `email`, `displayName`, `role` ("Admin" | "User"), `uid` (set after first sign-in), `createdAt` (timestamp)
 
+### 7. `locations`
+Managed in Settings. Used as the Location dropdown when adding/editing warehouses.
+- **Document ID**: auto-generated
+- **Fields**: `name`, `createdAt` (timestamp)
+
 ## Security (firestore.rules)
 
 All collections require `request.auth != null` for read and write. Deploy with:
@@ -58,5 +63,6 @@ npx firebase deploy --only firestore:indexes
 | Purchase orders| `purchaseOrders`  |
 | History / movements | `stockMovements` |
 | Members (auth allow-list) | `members` |
+| Locations (Settings) | `locations` |
 
 Everything is persisted in Firestore; the app uses real-time listeners (`onSnapshot`) and does not cache to localStorage or any other store.

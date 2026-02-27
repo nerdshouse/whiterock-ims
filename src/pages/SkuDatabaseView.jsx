@@ -23,9 +23,78 @@ function formatShortDate(ms) {
   return `${d.getDate()} ${months[d.getMonth()]}`;
 }
 
+function formatClosingStockDate(ms) {
+  if (ms == null) return '—';
+  const d = new Date(ms);
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+}
+
 function formatDateInput(ms) {
   if (ms == null) return '';
   return new Date(ms).toISOString().slice(0, 10);
+}
+
+function formatINR(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '₹ 0.00';
+  const [intPart, decPart] = n.toFixed(2).split('.');
+  const len = intPart.length;
+  if (len <= 3) return `₹ ${intPart}.${decPart}`;
+  let result = intPart.slice(-3);
+  let i = len - 3;
+  while (i > 0) {
+    const start = Math.max(0, i - 2);
+    result = intPart.slice(start, i) + ',' + result;
+    i = start;
+  }
+  return '₹ ' + result + '.' + decPart;
+}
+
+function escapeCsvCell(val) {
+  if (val == null) return '';
+  const s = String(val);
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function downloadSkuDatabaseCsv(rows, formatShortDateFn) {
+  const headers = [
+    'Warehouse', 'SKU', 'Item Name', 'Weight (kg)', 'Pcs in a Box', 'Lead time', 'Purchase Rate', 'Sell rate',
+    'Daily average', 'Safety Stock (Days)', 'Safety Stock (QTY)', 'Seasonal Buffer (Days)', 'Seasonal Buffer (QTY)',
+    'Growth Buffer (Days)', 'Growth Buffer (QTY)', 'Re-order Point', 'Closing Stock', 'Closing stock update date',
+    'Effective Stock', 'Stock end (days)',
+  ];
+  const line = (r) => [
+    escapeCsvCell(r.warehouseName),
+    escapeCsvCell(r.skuCode),
+    escapeCsvCell(r.itemName),
+    escapeCsvCell(r.weightKg),
+    escapeCsvCell(r.pcsInBox),
+    escapeCsvCell(r.leadTime),
+    escapeCsvCell(r.purchaseRate),
+    escapeCsvCell(r.sellRate),
+    escapeCsvCell(r.dailyAvg),
+    escapeCsvCell(r.safetyStockDays),
+    escapeCsvCell(r.safetyStockQty),
+    escapeCsvCell(r.seasonalBufferDays),
+    escapeCsvCell(r.seasonalBufferQty),
+    escapeCsvCell(r.growthBufferDays),
+    escapeCsvCell(r.growthBufferQty),
+    escapeCsvCell(r.reorderPoint != null ? Math.round(r.reorderPoint) : ''),
+    escapeCsvCell(r.closingStock),
+    escapeCsvCell(r.closingStockUpdateDate != null ? formatShortDateFn(r.closingStockUpdateDate) : ''),
+    escapeCsvCell(r.effectiveStock),
+    escapeCsvCell(r.stockEndDays != null ? r.stockEndDays : ''),
+  ].join(',');
+  const csv = [headers.join(','), ...rows.map(line)].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `sku-database-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function SkuDatabaseView() {
@@ -73,8 +142,9 @@ export default function SkuDatabaseView() {
       const reorderPoint = dailyAvg * leadTime + safetyQty + seasonalQty + growthQty;
       const closingStock = num(st.currentStock);
       const totalBufferQty = safetyQty + seasonalQty + growthQty;
-      // Effective Stock = closing stock qty − buffer qty (safety + seasonal + growth)
+      // Effective Stock = closing stock − (safety stock QTY + seasonal stock QTY + growth buffer stock QTY)
       const effectiveStock = closingStock - totalBufferQty;
+      const stockEndDays = dailyAvg > 0 ? Math.round(effectiveStock / dailyAvg) : null;
       return {
         ...st,
         sku,
@@ -96,6 +166,7 @@ export default function SkuDatabaseView() {
         closingStock,
         closingStockUpdateDate: st.closingStockUpdateDate ?? st.updatedAt,
         effectiveStock,
+        stockEndDays,
         monthlyPurchaseProj: dailyAvg * 30 * num(sku?.purchaseRate),
         monthlySellProj: dailyAvg * 30 * num(sku?.sellRate),
       };
@@ -179,7 +250,12 @@ export default function SkuDatabaseView() {
       if (stockEdits.safetyStockDays !== undefined && stockEdits.safetyStockDays !== '') stockPayload.safetyStockDays = Number(stockEdits.safetyStockDays);
       if (stockEdits.seasonalBufferDays !== undefined && stockEdits.seasonalBufferDays !== '') stockPayload.seasonalBufferDays = Number(stockEdits.seasonalBufferDays);
       if (stockEdits.growthBufferDays !== undefined && stockEdits.growthBufferDays !== '') stockPayload.growthBufferDays = Number(stockEdits.growthBufferDays);
-      if (stockEdits.currentStock !== undefined && stockEdits.currentStock !== '') stockPayload.currentStock = Number(stockEdits.currentStock);
+      // Always include currentStock when updating a stock row so Dashboard and real-time listeners get the latest value
+      if (row.warehouseId != null && row.skuCode != null) {
+        const v = stockEdits.currentStock;
+        const numVal = v !== undefined && v !== null && v !== '' ? Number(v) : NaN;
+        stockPayload.currentStock = Number.isFinite(numVal) ? numVal : Number(row.closingStock ?? row.currentStock ?? 0);
+      }
       if (stockEdits.closingStockUpdateDate !== undefined) {
         if (stockEdits.closingStockUpdateDate !== null && stockEdits.closingStockUpdateDate !== '') {
           const ms = typeof stockEdits.closingStockUpdateDate === 'number' ? stockEdits.closingStockUpdateDate : new Date(stockEdits.closingStockUpdateDate).getTime();
@@ -227,7 +303,18 @@ export default function SkuDatabaseView() {
     setError('');
     setSubmitting(true);
     try {
-      await deleteStockRecord(deleteConfirm.row.warehouseId, deleteConfirm.row.skuCode);
+      const { row } = deleteConfirm;
+      // Delete this warehouse+SKU stock row
+      await deleteStockRecord(row.warehouseId, row.skuCode);
+
+      // If this was the last stock row for this SKU across all warehouses,
+      // mark the SKU as Inactive so it no longer appears in dropdowns.
+      const remainingForSku = stock.filter(
+        (s) => s.skuCode === row.skuCode && s.id !== row.id,
+      );
+      if (remainingForSku.length === 0 && row.sku?.id) {
+        await updateSku(row.sku.id, { status: 'Inactive' });
+      }
       setDeleteConfirm(null);
     } catch (err) {
       setError(err.message);
@@ -250,6 +337,7 @@ export default function SkuDatabaseView() {
           </select>
           <button type="button" onClick={() => { setAddRowModal(true); setError(''); }} className="btn-primary">Add row</button>
           <button type="button" onClick={() => { setAddSkuModal(true); setError(''); }} className="btn-secondary">Add SKU</button>
+          <button type="button" onClick={() => downloadSkuDatabaseCsv(rows, formatClosingStockDate)} className="btn-secondary" disabled={rows.length === 0}>Download CSV</button>
         </div>
       </div>
 
@@ -260,12 +348,12 @@ export default function SkuDatabaseView() {
       <div className="mb-4 flex flex-wrap items-center gap-6 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] px-4 py-3 text-sm">
         <div>
           <span className="text-[var(--color-muted)]">Monthly Purchase Projection:</span>
-          <span className="ml-2 font-medium">{(totalMonthlyPurchase).toFixed(2)}</span>
+          <span className="ml-2 font-medium">{formatINR(totalMonthlyPurchase)}</span>
           <span className="ml-1 text-xs text-[var(--color-muted)]">(daily average × 30 × purchase rate)</span>
         </div>
         <div>
           <span className="text-[var(--color-muted)]">Monthly Sell projection:</span>
-          <span className="ml-2 font-medium">{(totalMonthlySell).toFixed(2)}</span>
+          <span className="ml-2 font-medium">{formatINR(totalMonthlySell)}</span>
           <span className="ml-1 text-xs text-[var(--color-muted)]">(daily average × 30 × sell rate)</span>
         </div>
       </div>
@@ -274,26 +362,32 @@ export default function SkuDatabaseView() {
         <table>
           <thead>
             <tr>
-              <th>Warehouse</th>
-              <th>SKU</th>
-              <th>Item Name</th>
-              <th>Weight (kg)</th>
-              <th>Pcs in a Box</th>
-              <th>Lead time</th>
-              <th>Purchase Rate</th>
-              <th>Sell rate</th>
-              <th>Daily average</th>
-              <th>Safety Stock (Days)</th>
-              <th>Safety Stock (QTY)</th>
-              <th>Seasonal Buffer (Days)</th>
-              <th>Seasonal Buffer (QTY)</th>
-              <th>Growth Buffer (Days)</th>
-              <th>Growth Buffer (QTY)</th>
-              <th>Re-order Point</th>
-              <th>Closing Stock</th>
-              <th>Closing stock update date</th>
-              <th>Effective Stock</th>
-              <th className="w-0 whitespace-nowrap">Actions</th>
+              <th rowSpan={2}>Warehouse</th>
+              <th rowSpan={2}>SKU</th>
+              <th rowSpan={2}>Item Name</th>
+              <th rowSpan={2}>Weight (kg)</th>
+              <th rowSpan={2}>Pcs in a Box</th>
+              <th rowSpan={2}>Lead time</th>
+              <th rowSpan={2}>Purchase Rate</th>
+              <th rowSpan={2}>Sell rate</th>
+              <th rowSpan={2}>Daily average</th>
+              <th colSpan={2} className="bg-[#dbeafe]">Safety Stock</th>
+              <th colSpan={2} className="bg-[#fef3c7]">Seasonal Buffer</th>
+              <th colSpan={2} className="bg-[#d1fae5]">Growth Buffer</th>
+              <th rowSpan={2}>Re-order Point</th>
+              <th rowSpan={2}>Closing Stock</th>
+              <th rowSpan={2}>Closing stock update date</th>
+              <th rowSpan={2}>Effective Stock</th>
+              <th rowSpan={2}>Stock end (days)</th>
+              <th rowSpan={2} className="w-0 whitespace-nowrap">Actions</th>
+            </tr>
+            <tr>
+              <th className="bg-[#dbeafe]">Days</th>
+              <th className="bg-[#dbeafe]">Quantity</th>
+              <th className="bg-[#fef3c7]">Days</th>
+              <th className="bg-[#fef3c7]">Quantity</th>
+              <th className="bg-[#d1fae5]">Days</th>
+              <th className="bg-[#d1fae5]">Quantity</th>
             </tr>
           </thead>
           <tbody>
@@ -302,22 +396,23 @@ export default function SkuDatabaseView() {
                 <td>{r.warehouseName}</td>
                 <td className="font-medium">{r.skuCode}</td>
                 <td>{r.itemName}</td>
-                <td>{r.weightKg}</td>
+                <td>{r.weightKg != null && r.weightKg !== '' ? `${r.weightKg} KG` : '—'}</td>
                 <td>{r.pcsInBox}</td>
-                <td>{r.leadTime}</td>
-                <td>{r.purchaseRate}</td>
-                <td>{r.sellRate}</td>
+                <td>{r.leadTime != null && r.leadTime !== '' ? `${r.leadTime} Days` : '—'}</td>
+                <td>{r.purchaseRate != null && r.purchaseRate !== '' ? `₹ ${r.purchaseRate}` : '—'}</td>
+                <td>{r.sellRate != null && r.sellRate !== '' ? `₹ ${r.sellRate}` : '—'}</td>
                 <td>{r.dailyAvg}</td>
-                <td>{r.safetyStockDays}</td>
-                <td>{r.safetyStockQty}</td>
-                <td>{r.seasonalBufferDays}</td>
-                <td>{r.seasonalBufferQty}</td>
-                <td>{r.growthBufferDays}</td>
-                <td>{r.growthBufferQty}</td>
+                <td className="bg-[#eff6ff]">{r.safetyStockDays != null && r.safetyStockDays !== '' ? `${r.safetyStockDays} Days` : '—'}</td>
+                <td className="bg-[#eff6ff]">{r.safetyStockQty}</td>
+                <td className="bg-[#fffbeb]">{r.seasonalBufferDays != null && r.seasonalBufferDays !== '' ? `${r.seasonalBufferDays} Days` : '—'}</td>
+                <td className="bg-[#fffbeb]">{r.seasonalBufferQty}</td>
+                <td className="bg-[#ecfdf5]">{r.growthBufferDays != null && r.growthBufferDays !== '' ? `${r.growthBufferDays} Days` : '—'}</td>
+                <td className="bg-[#ecfdf5]">{r.growthBufferQty}</td>
                 <td>{Math.round(r.reorderPoint)}</td>
                 <td>{r.closingStock}</td>
-                <td className="text-[var(--color-muted)]">{formatShortDate(r.closingStockUpdateDate)}</td>
+                <td className="text-[var(--color-muted)]">{formatClosingStockDate(r.closingStockUpdateDate)}</td>
                 <td>{r.effectiveStock}</td>
+                <td>{r.stockEndDays != null ? `${r.stockEndDays} Days` : '—'}</td>
                 <td className="whitespace-nowrap">
                   <div className="flex flex-wrap gap-2">
                     <button type="button" onClick={() => openEdit(r)} className="btn-ghost py-1 text-xs">Edit</button>

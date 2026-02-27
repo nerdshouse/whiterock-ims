@@ -8,6 +8,7 @@ import SkuDatabaseView from './pages/SkuDatabaseView';
 import History from './pages/History';
 import PurchaseOrders from './pages/PurchaseOrders';
 import Members from './pages/Members';
+import Settings from './pages/Settings';
 
 function Layout({ children }) {
   const { user, memberRole, logout } = useAuth();
@@ -19,7 +20,7 @@ function Layout({ children }) {
     { to: '/sku-database', label: 'SKU Database' },
     { to: '/purchase-orders', label: 'PO' },
     { to: '/history', label: 'History' },
-    ...(memberRole === 'Admin' ? [{ to: '/members', label: 'Members' }] : []),
+    ...(memberRole === 'Admin' ? [{ to: '/settings', label: 'Settings' }] : []),
   ];
   return (
     <div className="min-h-screen bg-[var(--color-surface)]">
@@ -56,9 +57,9 @@ function PrivateRoute({ children }) {
   return children;
 }
 
-function MembersRoute() {
+function SettingsRoute() {
   const { memberRole } = useAuth();
-  return memberRole === 'Admin' ? <Members /> : <Navigate to="/warehouses" replace />;
+  return memberRole === 'Admin' ? <Settings /> : <Navigate to="/warehouses" replace />;
 }
 
 function AppRoutes() {
@@ -76,7 +77,7 @@ function AppRoutes() {
               <Route path="/sku-database" element={<SkuDatabaseView />} />
               <Route path="/history" element={<History />} />
               <Route path="/purchase-orders" element={<PurchaseOrders />} />
-              <Route path="/members" element={<MembersRoute />} />
+              <Route path="/settings" element={<SettingsRoute />} />
             </Routes>
           </Layout>
         </PrivateRoute>
