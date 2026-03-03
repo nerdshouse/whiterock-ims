@@ -1,66 +1,39 @@
 import { useState, useEffect } from 'react';
-import { subscribeLocations, addLocation, deleteLocation, updateLocation } from '../lib/db';
+import { subscribeWarehouses, addWarehouse, updateWarehouse, deleteWarehouse } from '../lib/db';
 import Members from './Members';
 
-const PencilIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-    <path d="m2.695 14.762-1.262 3.154a.5.5 0 0 0 .65.65l3.155-1.262a2 2 0 0 0 1.11-.57L17.5 5.5a2.121 2.121 0 0 0-3-3L3.265 13.653a2 2 0 0 0-.57 1.11Z" />
-  </svg>
-);
-
-const TrashIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-    <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.519.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clipRule="evenodd" />
-  </svg>
-);
-
-const CheckIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-    <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
-  </svg>
-);
-
 export default function Settings() {
-  const [locations, setLocations] = useState([]);
-  const [locationName, setLocationName] = useState('');
+  const [warehouses, setWarehouses] = useState([]);
+  const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editName, setEditName] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, name }
 
   useEffect(() => {
-    const unsub = subscribeLocations(setLocations);
+    const unsub = subscribeWarehouses(setWarehouses);
     return () => unsub();
   }, []);
 
-  const handleAddLocation = async (e) => {
+  const handleAddWarehouse = async (e) => {
     e.preventDefault();
-    const name = locationName.trim();
-    if (!name) return;
+    if (!name.trim()) return;
     setError('');
     setSubmitting(true);
     try {
-      await addLocation(name);
-      setLocationName('');
+      await addWarehouse({ name: name.trim(), location: '' });
+      setName('');
     } catch (e) {
-      setError(e.message);
+      setError(e.message || 'Failed to add warehouse');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleRemoveLocation = async (id) => {
-    setError('');
-    try {
-      await deleteLocation(id);
-    } catch (e) {
-      setError(e.message);
-    }
-  };
-
-  const startEdit = (loc) => {
-    setEditingId(loc.id);
-    setEditName(loc.name || '');
+  const startEdit = (w) => {
+    setEditingId(w.id);
+    setEditName(w.name || '');
     setError('');
   };
 
@@ -69,36 +42,50 @@ export default function Settings() {
     setEditName('');
   };
 
-  const saveEdit = async (e) => {
+  const handleSaveEdit = async (e) => {
     e?.preventDefault();
-    if (editingId == null) return;
-    const name = editName.trim();
-    if (!name) return cancelEdit();
+    if (!editingId) return;
+    const next = editName.trim();
+    if (!next) return;
     setError('');
     setSubmitting(true);
     try {
-      await updateLocation(editingId, name);
+      await updateWarehouse(editingId, { name: next });
       setEditingId(null);
       setEditName('');
     } catch (e) {
-      setError(e.message);
+      setError(e.message || 'Failed to update warehouse');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteWarehouse = async () => {
+    if (!deleteConfirm) return;
+    setError('');
+    setSubmitting(true);
+    try {
+      await deleteWarehouse(deleteConfirm.id);
+      setDeleteConfirm(null);
+    } catch (e) {
+      setError(e.message || 'Failed to delete warehouse');
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-5xl">
+    <div className="max-w-6xl">
       <h1 className="page-head mb-6">Settings</h1>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
-        {/* Locations box - reduced width */}
-        <section className="max-w-sm">
+        {/* Warehouses box */}
+        <section className="min-w-0">
           <div className="card overflow-hidden p-0">
             <div className="border-b border-[var(--color-border)] bg-[#f8fafc] px-4 py-3">
-              <h2 className="text-lg font-semibold">Locations</h2>
+              <h2 className="text-lg font-semibold">Warehouses</h2>
               <p className="mt-0.5 text-sm text-[var(--color-muted)]">
-                Add locations here. They appear in the Warehouse page when setting a warehouse&apos;s Location.
+                Quickly add warehouses. You can view and manage full details from the Warehouses page.
               </p>
             </div>
             <div className="p-4">
@@ -107,85 +94,89 @@ export default function Settings() {
                   {error}
                 </div>
               )}
-              <form onSubmit={handleAddLocation} className="mb-4 flex flex-wrap items-end gap-3">
-                <div className="min-w-[120px] flex-1">
-                  <label className="mb-1 block text-sm text-[var(--color-muted)]">Add location</label>
+              <form onSubmit={handleAddWarehouse} className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <div className="min-w-[160px]">
+                  <label className="mb-1 block text-sm text-[var(--color-muted)]">Name</label>
                   <input
                     type="text"
-                    placeholder="e.g. Bhiwandi, Mumbai"
-                    value={locationName}
-                    onChange={(e) => setLocationName(e.target.value)}
+                    placeholder="Warehouse name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
                     className="input w-full"
+                    required
                   />
                 </div>
-                <button type="submit" disabled={submitting || !locationName.trim()} className="btn-primary">
-                  {submitting ? 'Adding…' : 'Add'}
-                </button>
+                <div className="flex items-end justify-start">
+                  <button type="submit" disabled={submitting || !name.trim()} className="btn-primary">
+                    {submitting ? 'Adding…' : 'Add warehouse'}
+                  </button>
+                </div>
               </form>
+
               <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
-                <table className="w-full locations-settings-table">
+                <table className="w-full text-sm">
                   <thead>
                     <tr>
-                      <th>Location</th>
+                      <th className="px-4 py-2 text-left text-[var(--color-muted)]">Name</th>
+                      <th className="px-4 py-2 text-left text-[var(--color-muted)]">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {locations.map((loc) => (
-                      <tr key={loc.id}>
-                        <td className="align-middle py-2">
-                          {editingId === loc.id ? (
-                            <form onSubmit={saveEdit} className="flex items-center gap-2">
+                    {warehouses.map((w) => (
+                      <tr key={w.id} className="border-t border-[var(--color-border)]">
+                        <td className="px-4 py-2">
+                          {editingId === w.id ? (
+                            <form onSubmit={handleSaveEdit} className="flex items-center gap-2">
                               <input
                                 type="text"
                                 value={editName}
                                 onChange={(e) => setEditName(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Escape' && cancelEdit()}
-                                style={{ width: `${Math.max(8, Math.min(24, editName.length + 2))}ch` }}
-                                className="input py-1 text-sm max-w-[180px]"
+                                className="input py-1 text-sm max-w-[220px]"
                                 autoFocus
                               />
-                              <button type="submit" className="btn-ghost p-1 text-green-600 hover:text-green-700" title="Save">
-                                <CheckIcon />
-                              </button>
-                              <button type="button" onClick={cancelEdit} className="btn-ghost p-1 text-xs text-[var(--color-muted)]" title="Cancel">
+                              <button type="submit" className="btn-ghost py-1 text-xs">Save</button>
+                              <button type="button" onClick={cancelEdit} className="btn-ghost py-1 text-xs text-[var(--color-muted)]">
                                 Cancel
                               </button>
                             </form>
                           ) : (
-                            <div className="flex items-center gap-2">
-                              <span>{loc.name}</span>
-                              <button
-                                type="button"
-                                onClick={() => startEdit(loc)}
-                                className="btn-ghost p-1 text-[var(--color-muted)] hover:text-[var(--color-fg)]"
-                                title="Edit"
-                              >
-                                <PencilIcon />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveLocation(loc.id)}
-                                className="btn-ghost p-1 text-[var(--color-muted)] hover:text-[var(--color-danger)] hover:bg-red-50"
-                                title="Delete"
-                              >
-                                <TrashIcon />
-                              </button>
-                            </div>
+                            w.name
                           )}
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => startEdit(w)}
+                              className="btn-ghost py-1 text-xs"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirm({ id: w.id, name: w.name })}
+                              className="btn-ghost py-1 text-xs text-[var(--color-danger)] hover:bg-red-50 hover:text-[var(--color-danger)]"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                {locations.length === 0 && (
-                  <p className="px-4 py-6 text-center text-sm text-[var(--color-muted)]">No locations yet. Add one above.</p>
+                {warehouses.length === 0 && (
+                  <p className="px-4 py-6 text-center text-sm text-[var(--color-muted)]">
+                    No warehouses yet. Add one above.
+                  </p>
                 )}
               </div>
             </div>
           </div>
         </section>
 
-        {/* Members box - next to Locations */}
+        {/* Members box */}
         <section className="min-w-0">
           <div className="card overflow-hidden p-0">
             <div className="border-b border-[var(--color-border)] bg-[#f8fafc] px-4 py-3">
@@ -200,6 +191,25 @@ export default function Settings() {
           </div>
         </section>
       </div>
+
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/40 p-4" onClick={() => setDeleteConfirm(null)}>
+          <div className="card max-w-sm w-full p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
+            <h2 className="mb-2 text-lg font-semibold">Delete warehouse</h2>
+            <p className="mb-4 text-sm text-[var(--color-muted)]">
+              Delete <strong>{deleteConfirm.name}</strong>? This cannot be undone and may affect linked stock.
+            </p>
+            <div className="flex gap-2">
+              <button type="button" onClick={handleDeleteWarehouse} disabled={submitting} className="btn-danger">
+                {submitting ? 'Deleting…' : 'Delete'}
+              </button>
+              <button type="button" onClick={() => setDeleteConfirm(null)} className="btn-secondary">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

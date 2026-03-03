@@ -405,18 +405,38 @@ export async function getPurchaseOrders(withinDays = 60) {
 }
 
 export async function addPurchaseOrder(payload) {
-  const { poNumber, warehouseId, skuCode, quantity, etd, eta } = payload;
+  const {
+    poNumber,
+    warehouseId,
+    skuCode,
+    quantity,
+    etd,
+    eta,
+    type,
+    groupId,
+    locked,
+    archived,
+    finalEtaEarlyBy,
+  } = payload;
   if (!poNumber || !warehouseId || !skuCode) throw new Error('PO number, warehouse, and SKU are required');
   const qty = Number(quantity);
   if (!Number.isFinite(qty) || qty < 1) throw new Error('Quantity must be at least 1');
+  const cleanPoNumber = String(poNumber).trim();
   const ref = await addDoc(purchaseOrdersCollection(), {
-    poNumber: String(poNumber).trim(),
+    poNumber: cleanPoNumber,
+    groupId: groupId ? String(groupId).trim() : cleanPoNumber,
+    type: type === 'B' ? 'B' : 'A',
     warehouseId: String(warehouseId).trim(),
     skuCode: String(skuCode).trim(),
     quantity: qty,
     etd: etd ? new Date(etd) : new Date(),
     eta: eta ? new Date(eta) : null,
     status: 'Pending',
+    locked: Boolean(locked) || false,
+    archived: Boolean(archived) || false,
+    ...(finalEtaEarlyBy !== undefined && Number.isFinite(Number(finalEtaEarlyBy))
+      ? { finalEtaEarlyBy: Number(finalEtaEarlyBy) }
+      : {}),
     createdAt: Timestamp.now(),
   });
   const d = await getDoc(ref);
@@ -431,38 +451,12 @@ export async function updatePurchaseOrderStatus(id, status, reason) {
   if (po.status === 'Received') throw new Error('PO already received; cannot change status');
 
   const updatePayload = { status, updatedAt: serverTimestamp() };
-  if (reason != null && String(reason).trim() !== '') updatePayload.statusReason = String(reason).trim();
-
-  if (status === 'Received') {
-    const batch = writeBatch(db);
-    const stockId = stockDocId(po.warehouseId, po.skuCode);
-    const stockRef = doc(db, 'stock', stockId);
-    const stockSnap = await getDoc(stockRef);
-    const prev = stockSnap.exists() ? stockSnap.data().currentStock : 0;
-    const nextStock = prev + Number(po.quantity);
-    const stockPayload = {
-      warehouseId: po.warehouseId,
-      skuCode: po.skuCode,
-      currentStock: nextStock,
-      dailyAvgSale: stockSnap.exists() ? stockSnap.data().dailyAvgSale : 0,
-      leadTime: stockSnap.exists() ? stockSnap.data().leadTime : 0,
-      updatedAt: serverTimestamp(),
-    };
-    batch.set(stockRef, stockPayload, stockSnap.exists() ? { merge: true } : {});
-    batch.update(ref, { ...updatePayload, status: 'Received' });
-    await batch.commit();
-    await addStockMovement({
-      warehouseId: po.warehouseId,
-      skuCode: po.skuCode,
-      changeType: 'po_received',
-      quantityDelta: Number(po.quantity),
-      previousStock: prev,
-      newStock: nextStock,
-      metadata: { poNumber: po.poNumber, reason: updatePayload.statusReason || null },
-    });
-  } else {
-    await updateDoc(ref, updatePayload);
+  if (reason != null && String(reason).trim() !== '') {
+    updatePayload.statusReason = String(reason).trim();
   }
+
+  // Important: changing PO status must NOT modify stock / SKU database.
+  await updateDoc(ref, updatePayload);
   const d = await getDoc(ref);
   return snapToDoc(d);
 }
@@ -471,9 +465,15 @@ export async function updatePurchaseOrder(id, updates) {
   const ref = doc(db, 'purchaseOrders', id);
   const o = { updatedAt: serverTimestamp() };
   if (updates.poNumber !== undefined) o.poNumber = String(updates.poNumber).trim();
+  if (updates.groupId !== undefined) o.groupId = String(updates.groupId).trim();
   if (updates.quantity !== undefined) o.quantity = Number(updates.quantity);
   if (updates.etd !== undefined) o.etd = new Date(updates.etd);
   if (updates.eta !== undefined) o.eta = updates.eta ? new Date(updates.eta) : null;
+  if (updates.finalEtaEarlyBy !== undefined) {
+    const v = updates.finalEtaEarlyBy;
+    o.finalEtaEarlyBy = v === null || v === '' ? null : Number(v);
+  }
+  if (updates.archived !== undefined) o.archived = Boolean(updates.archived);
   if (updates.status !== undefined && ['Pending', 'In Transit', 'Received'].includes(updates.status)) o.status = updates.status;
   await updateDoc(ref, o);
   const d = await getDoc(ref);

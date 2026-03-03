@@ -7,7 +7,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "seed-member": "node scripts/seed-first-member.js",
-    "seed-locations": "node scripts/seed-locations.js"
+    "seed-locations": "node scripts/seed-locations.js",
+    "seed-pos": "node scripts/seed-pos.js"
   },
   "dependencies": {
     "firebase": "^12.9.0",

@@ -95,7 +95,7 @@ export default function Members({ embedInSettings = false }) {
         </div>
       )}
       {embedInSettings && (
-        <div className="flex flex-wrap items-center justify-end gap-4 mb-4">
+        <div className="mb-4 flex justify-end">
           <button type="button" onClick={openAdd} className="btn-primary">
             Add member
           </button>
@@ -108,46 +108,89 @@ export default function Members({ embedInSettings = false }) {
         </div>
       )}
 
-      <div className="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Added</th>
-              <th className="w-0">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((m) => (
-              <tr key={m.id}>
-                <td>{m.displayName || '—'}</td>
-                <td>{m.email}</td>
-                <td>{m.role || 'User'}</td>
-                <td className="text-[var(--color-muted)]">{formatDate(m.createdAt)}</td>
-                <td>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => openEdit(m)} className="btn-ghost py-1 text-xs">
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setModal({ type: 'delete', member: m })}
-                      className="btn-ghost py-1 text-xs text-[var(--color-danger)] hover:bg-red-50 hover:text-[var(--color-danger)]"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </td>
+      {embedInSettings ? (
+        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] overflow-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr>
+                <th className="px-4 py-2 text-left text-[var(--color-muted)]">Name</th>
+                <th className="px-4 py-2 text-left text-[var(--color-muted)]">Email</th>
+                <th className="px-4 py-2 text-left text-[var(--color-muted)]">Role</th>
+                <th className="px-4 py-2 text-left text-[var(--color-muted)]">Added</th>
+                <th className="px-4 py-2 text-left text-[var(--color-muted)]">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-        {list.length === 0 && (
-          <p className="px-4 py-8 text-center text-[var(--color-muted)]">No members yet. Add one to get started.</p>
-        )}
-      </div>
+            </thead>
+            <tbody>
+              {list.map((m) => (
+                <tr key={m.id} className="border-t border-[var(--color-border)]">
+                  <td className="px-4 py-2">{m.displayName || '—'}</td>
+                  <td className="px-4 py-2">{m.email}</td>
+                  <td className="px-4 py-2">{m.role || 'User'}</td>
+                  <td className="px-4 py-2 text-[var(--color-muted)]">{formatDate(m.createdAt)}</td>
+                  <td className="px-4 py-2">
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => openEdit(m)} className="btn-ghost py-1 text-xs">
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setModal({ type: 'delete', member: m })}
+                        className="btn-ghost py-1 text-xs text-[var(--color-danger)] hover:bg-red-50 hover:text-[var(--color-danger)]"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {list.length === 0 && (
+            <p className="px-4 py-6 text-center text-sm text-[var(--color-muted)]">No members yet. Add one to get started.</p>
+          )}
+        </div>
+      ) : (
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Added</th>
+                <th className="w-0">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((m) => (
+                <tr key={m.id}>
+                  <td>{m.displayName || '—'}</td>
+                  <td>{m.email}</td>
+                  <td>{m.role || 'User'}</td>
+                  <td className="text-[var(--color-muted)]">{formatDate(m.createdAt)}</td>
+                  <td>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => openEdit(m)} className="btn-ghost py-1 text-xs">
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setModal({ type: 'delete', member: m })}
+                        className="btn-ghost py-1 text-xs text-[var(--color-danger)] hover:bg-red-50 hover:text-[var(--color-danger)]"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {list.length === 0 && (
+            <p className="px-4 py-8 text-center text-[var(--color-muted)]">No members yet. Add one to get started.</p>
+          )}
+        </div>
+      )}
 
       {/* Add modal */}
       {modal === 'add' && (
