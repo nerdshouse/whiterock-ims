@@ -265,6 +265,7 @@ export default function PurchaseOrders() {
         warehouseId: '',
         skuCode: '',
         multiSkuCodes: [],
+        multiSkuQuantities: {},
         quantity: '',
         etd: formatDate(Date.now()),
         eta: '',
@@ -282,6 +283,7 @@ export default function PurchaseOrders() {
         warehouseId: '',
         skuCode: '',
         multiSkuCodes: [],
+        multiSkuQuantities: {},
         quantity: '',
         etd: formatDate(Date.now()),
         eta: '',
@@ -299,26 +301,31 @@ export default function PurchaseOrders() {
     const multiSkuCodes = Array.isArray(newRowA.multiSkuCodes)
       ? newRowA.multiSkuCodes.filter((v) => v && v.trim())
       : [];
-    const skusToUse = multiSkuCodes.length > 1 ? multiSkuCodes : (skuCode ? [skuCode] : []);
+    const skusToUse = multiSkuCodes.length > 0 ? multiSkuCodes : (skuCode ? [skuCode] : []);
+    const qtyMap = newRowA.multiSkuQuantities || {};
     const cleanGroupId = (newRowA.groupId || '').trim() || cleanPo;
-    const qty = Number(newRowA.quantity);
     if (!cleanPo || !cleanWarehouse || skusToUse.length === 0) {
       setError('PO Number, Warehouse, and at least one SKU are required.');
       return;
     }
-    if (!Number.isFinite(qty) || qty < 1) {
-      setError('Quantity must be at least 1.');
+    const perItemQtys = skusToUse.map((code) => {
+      const raw = qtyMap[code];
+      if (raw !== undefined && raw !== null && raw !== '') return Number(raw);
+      return NaN;
+    });
+    if (!perItemQtys.every((q) => Number.isFinite(q) && q >= 1)) {
+      setError('Please enter quantity next to each selected item in the chooser (at least 1).');
       return;
     }
     setSubmitting(true);
     try {
       await Promise.all(
-        skusToUse.map((code) =>
+        skusToUse.map((code, index) =>
           addPurchaseOrder({
             poNumber: cleanPo,
             warehouseId: cleanWarehouse,
             skuCode: code,
-            quantity: qty,
+            quantity: perItemQtys[index],
             etd: newRowA.etd || undefined,
             eta: newRowA.eta || undefined,
             type: 'A',
@@ -344,15 +351,20 @@ export default function PurchaseOrders() {
     const multiSkuCodes = Array.isArray(newRowB.multiSkuCodes)
       ? newRowB.multiSkuCodes.filter((v) => v && v.trim())
       : [];
-    const skusToUse = multiSkuCodes.length > 1 ? multiSkuCodes : (skuCode ? [skuCode] : []);
+    const skusToUse = multiSkuCodes.length > 0 ? multiSkuCodes : (skuCode ? [skuCode] : []);
+    const qtyMap = newRowB.multiSkuQuantities || {};
     const cleanGroupId = (newRowB.groupId || '').trim();
-    const qty = Number(newRowB.quantity);
+    const perItemQtys = skusToUse.map((code) => {
+      const raw = qtyMap[code];
+      if (raw !== undefined && raw !== null && raw !== '') return Number(raw);
+      return NaN;
+    });
     if (!cleanPo || !cleanWarehouse || skusToUse.length === 0) {
       setError('PO Number, Warehouse, and at least one SKU are required.');
       return;
     }
-    if (!Number.isFinite(qty) || qty < 1) {
-      setError('Quantity must be at least 1.');
+    if (!perItemQtys.every((q) => Number.isFinite(q) && q >= 1)) {
+      setError('Please enter quantity next to each selected item in the chooser (at least 1).');
       return;
     }
     const finalEtaEarlyBy =
@@ -366,12 +378,12 @@ export default function PurchaseOrders() {
     setSubmitting(true);
     try {
       await Promise.all(
-        skusToUse.map((code) =>
+        skusToUse.map((code, index) =>
           addPurchaseOrder({
             poNumber: cleanPo,
             warehouseId: cleanWarehouse,
             skuCode: code,
-            quantity: qty,
+            quantity: perItemQtys[index],
             etd: newRowB.etd || undefined,
             eta: newRowB.eta || undefined,
             type: 'B',
@@ -729,16 +741,8 @@ export default function PurchaseOrders() {
                       className="input w-full"
                     />
                   </td>
-                  <td>
-                    <input
-                      type="number"
-                      min="1"
-                      value={newRowA.quantity}
-                      onChange={(e) =>
-                        setNewRowA((prev) => ({ ...(prev || {}), quantity: e.target.value }))
-                      }
-                      className="input w-full"
-                    />
+                  <td className="text-[10px] text-[var(--color-muted)]">
+                    Set quantity per item in “Choose…” dialog
                   </td>
                   <td>—</td>
                   <td>
@@ -956,16 +960,8 @@ export default function PurchaseOrders() {
                       className="input w-full"
                     />
                   </td>
-                  <td>
-                    <input
-                      type="number"
-                      min="1"
-                      value={newRowB.quantity}
-                      onChange={(e) =>
-                        setNewRowB((prev) => ({ ...(prev || {}), quantity: e.target.value }))
-                      }
-                      className="input w-full"
-                    />
+                  <td className="text-[10px] text-[var(--color-muted)]">
+                    Set quantity per item in “Choose…” dialog
                   </td>
                   <td>
                     {draftCalcB.stockEndDateMs != null
@@ -1550,7 +1546,7 @@ export default function PurchaseOrders() {
                 return (
                   <label
                     key={s.id}
-                    className="flex items-center gap-2 border-b border-[var(--color-border)] px-3 py-2 text-sm last:border-b-0"
+                    className="flex items-center gap-3 border-b border-[var(--color-border)] px-3 py-2 text-sm last:border-b-0"
                   >
                     <input
                       type="checkbox"
@@ -1614,10 +1610,62 @@ export default function PurchaseOrders() {
                         }
                       }}
                     />
-                    <span className="font-medium">{label}</span>
-                    <span className="ml-auto text-[10px] text-[var(--color-muted)]">
-                      {code}
-                    </span>
+                    <div className="flex flex-1 items-center gap-2">
+                      <span className="font-medium">{label}</span>
+                      <span className="text-[10px] text-[var(--color-muted)]">
+                        {code}
+                      </span>
+                    </div>
+                    {itemPicker.context !== 'planning' && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-[var(--color-muted)]">Qty</span>
+                        <input
+                          type="number"
+                          min="1"
+                          className="input h-7 w-20 px-2 text-xs"
+                          value={(() => {
+                            if (itemPicker.context === 'A' && newRowA) {
+                              const map = newRowA.multiSkuQuantities || {};
+                              return map[code] ?? '';
+                            }
+                            if (itemPicker.context === 'B' && newRowB) {
+                              const map = newRowB.multiSkuQuantities || {};
+                              return map[code] ?? '';
+                            }
+                            return '';
+                          })()}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (itemPicker.context === 'A') {
+                              setNewRowA((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      multiSkuQuantities: {
+                                        ...(prev.multiSkuQuantities || {}),
+                                        [code]: val,
+                                      },
+                                    }
+                                  : prev,
+                              );
+                            } else if (itemPicker.context === 'B') {
+                              setNewRowB((prev) =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      multiSkuQuantities: {
+                                        ...(prev.multiSkuQuantities || {}),
+                                        [code]: val,
+                                      },
+                                    }
+                                  : prev,
+                              );
+                            }
+                          }}
+                          disabled={!selected}
+                        />
+                      </div>
+                    )}
                   </label>
                 );
               })}
