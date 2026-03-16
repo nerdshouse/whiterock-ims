@@ -10,7 +10,7 @@ import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const [error, setError] = useState('');
-  const { user, loginWithGoogle, notAuthorized, clearNotAuthorized } = useAuth();
+  const { user, firebaseReady, loginWithGoogle, notAuthorized, clearNotAuthorized } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -32,6 +32,11 @@ export default function Login() {
       <div className="card w-full max-w-[380px] p-8">
         <h1 className="page-head mb-6 text-center text-2xl">IMS</h1>
         <p className="mb-6 text-center text-sm text-[var(--color-muted)]">Inventory Reorder Planning</p>
+        {!firebaseReady && (
+          <p className="mb-4 text-center text-sm text-[var(--color-danger)]">
+            Firebase config is missing. Add `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, and `VITE_FIREBASE_APP_ID`.
+          </p>
+        )}
         {error && <p className="mb-4 text-center text-sm text-[var(--color-danger)]">{error}</p>}
         {notAuthorized && (
           <p className="mb-4 text-center text-sm text-[var(--color-danger)]">
@@ -45,6 +50,7 @@ export default function Login() {
             setError('');
             handleGoogleSignIn();
           }}
+          disabled={!firebaseReady}
           className="btn-primary flex w-full items-center justify-center gap-2"
         >
           <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden>

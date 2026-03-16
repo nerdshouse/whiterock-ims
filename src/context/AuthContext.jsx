@@ -17,8 +17,13 @@ export function AuthProvider({ children }) {
   const [memberRole, setMemberRole] = useState(null); // 'Admin' | 'User' | null
   const [loading, setLoading] = useState(true);
   const [notAuthorized, setNotAuthorized] = useState(false);
+  const firebaseReady = !!auth;
 
   useEffect(() => {
+    if (!auth) {
+      setLoading(false);
+      return;
+    }
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (!u) {
         setUser(null);
@@ -48,13 +53,32 @@ export function AuthProvider({ children }) {
     return () => unsub();
   }, []);
 
-  const loginWithGoogle = () => signInWithPopup(auth, new GoogleAuthProvider());
-  const logout = () => signOut(auth);
+  const loginWithGoogle = () =>
+    auth
+      ? signInWithPopup(auth, new GoogleAuthProvider())
+      : Promise.reject(
+          new Error(
+            'Firebase is not configured. Set VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, and VITE_FIREBASE_APP_ID.',
+          ),
+        );
+  const logout = () => (auth ? signOut(auth) : Promise.resolve());
   const getIdToken = () => (user ? user.getIdToken() : Promise.resolve(null));
   const clearNotAuthorized = () => setNotAuthorized(false);
 
   return (
-    <AuthContext.Provider value={{ user, memberRole, loading, firebaseReady: true, loginWithGoogle, logout, getIdToken, notAuthorized, clearNotAuthorized }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        memberRole,
+        loading,
+        firebaseReady,
+        loginWithGoogle,
+        logout,
+        getIdToken,
+        notAuthorized,
+        clearNotAuthorized,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

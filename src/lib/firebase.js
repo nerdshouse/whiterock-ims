@@ -16,6 +16,14 @@ const config = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
 };
 
-const app = initializeApp(config);
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+let app = null;
+let auth = null;
+let db = null;
+
+if (config.apiKey && config.authDomain && config.projectId && config.appId) {
+  app = initializeApp(config);
+  auth = getAuth(app);
+  db = getFirestore(app);
+}
+
+export { app, auth, db };
